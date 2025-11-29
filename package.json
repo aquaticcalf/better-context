@@ -1,0 +1,23 @@
+{
+  "name": "better-context",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src",
+    "build": "bun build src/index.ts --outdir dist",
+    "start": "bun dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "prepare": "effect-language-service patch"
+  },
+  "devDependencies": {
+    "@effect/language-service": "^0.57.1",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@effect/platform": "^0.93.5",
+    "@effect/platform-bun": "^0.85.0",
+    "effect": "^3.19.8"
+  }
+}
