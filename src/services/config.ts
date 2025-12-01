@@ -53,8 +53,8 @@ const DEFAULT_CONFIG: Config = {
       branch: "canary",
     },
   ],
-  model: "grok-code",
-  provider: "opencode",
+  model: "claude-haiku-4-5",
+  provider: "anthropic",
 };
 
 const OPENCODE_CONFIG = (args: {
