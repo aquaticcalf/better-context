@@ -22,8 +22,7 @@
   },
   "files": [
     "bin.js",
-    "dist",
-    "README.md"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
