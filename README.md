@@ -50,20 +50,36 @@ This is an evolution of: https://github.com/bmdavis419/opencode-hosted-docs-nons
 bun i
 ```
 
-## Usage
+## Development
+
+Run CLI commands from the repo root:
+
+```sh
+# Show help
+bun run cli --help
+
+# Ask a question
+bun run cli:ask -t <tech> -q "<question>"
+
+# Start HTTP server
+bun run cli:serve -p <port>
+
+# Hold open instance in background
+bun run cli:open
+```
 
 ### CLI - Ask a question
 
 Ask a question about a specific technology directly from the command line:
 
 ```sh
-bun run src/index.ts ask -t <tech> -q "<question>"
+bun run cli:ask -t <tech> -q "<question>"
 ```
 
 Example:
 
 ```sh
-bun run src/index.ts ask -t effect -q "How does Effect.tap work?"
+bun run cli:ask -t effect -q "How does Effect.tap work?"
 ```
 
 ### HTTP Server
@@ -71,13 +87,13 @@ bun run src/index.ts ask -t effect -q "How does Effect.tap work?"
 Start the HTTP server to accept questions via API:
 
 ```sh
-bun run src/index.ts serve -p <port>
+bun run cli:serve -p <port>
 ```
 
 Example:
 
 ```sh
-bun run src/index.ts serve -p 8080
+bun run cli:serve -p 8080
 ```
 
 Then make POST requests to `/question`:
@@ -97,7 +113,7 @@ Response:
 ### Help
 
 ```sh
-bun run src/index.ts --help
-bun run src/index.ts ask --help
-bun run src/index.ts serve --help
+bun run cli --help
+bun run cli:ask --help
+bun run cli:serve --help
 ```
