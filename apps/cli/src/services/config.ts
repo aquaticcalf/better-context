@@ -27,6 +27,7 @@ const configSchema = Schema.Struct({
 });
 
 type Config = typeof configSchema.Type;
+type Repo = typeof repoSchema.Type;
 
 const DEFAULT_CONFIG: Config = {
   promptsDirectory: `${CONFIG_DIRECTORY}/prompts`,
@@ -57,6 +58,45 @@ const DEFAULT_CONFIG: Config = {
   model: "big-pickle",
   provider: "opencode",
 };
+
+const collapseHome = (path: string): string => {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  if (home && path.startsWith(home)) {
+    return "~" + path.slice(home.length);
+  }
+  return path;
+};
+
+const writeConfig = (config: Config) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const fs = yield* FileSystem.FileSystem;
+
+    const configDir = yield* expandHome(CONFIG_DIRECTORY);
+    const configPath = path.join(configDir, CONFIG_FILENAME);
+
+    // Collapse expanded paths back to tilde for storage
+    const configToWrite: Config = {
+      ...config,
+      promptsDirectory: collapseHome(config.promptsDirectory),
+      reposDirectory: collapseHome(config.reposDirectory),
+    };
+
+    yield* fs
+      .writeFileString(configPath, JSON.stringify(configToWrite, null, 2))
+      .pipe(
+        Effect.catchAll((error) =>
+          Effect.fail(
+            new ConfigError({
+              message: "Failed to write config",
+              cause: error,
+            })
+          )
+        )
+      );
+
+    return configToWrite;
+  });
 
 const OPENCODE_CONFIG = (args: {
   repoName: string;
@@ -192,7 +232,7 @@ const configService = Effect.gen(function* () {
   const path = yield* Path.Path;
   const loadedConfig = yield* onStartLoadConfig;
 
-  const { config, configPath } = loadedConfig;
+  let { config, configPath } = loadedConfig;
 
   const getRepo = ({
     repoName,
@@ -242,6 +282,27 @@ const configService = Effect.gen(function* () {
         });
       }),
     rawConfig: () => Effect.succeed(config),
+    getRepos: () => Effect.succeed(config.repos),
+    getModel: () =>
+      Effect.succeed({ provider: config.provider, model: config.model }),
+    updateModel: (args: { provider: string; model: string }) =>
+      Effect.gen(function* () {
+        config = { ...config, provider: args.provider, model: args.model };
+        yield* writeConfig(config);
+        return { provider: config.provider, model: config.model };
+      }),
+    addRepo: (repo: Repo) =>
+      Effect.gen(function* () {
+        const existing = config.repos.find((r) => r.name === repo.name);
+        if (existing) {
+          return yield* Effect.fail(
+            new ConfigError({ message: `Repo "${repo.name}" already exists` })
+          );
+        }
+        config = { ...config, repos: [...config.repos, repo] };
+        yield* writeConfig(config);
+        return repo;
+      }),
   };
 });
 

@@ -172,14 +172,148 @@ const serveCommand = Command.make("serve", { port: portOption }, ({ port }) =>
   }).pipe(Effect.scoped, Effect.provide(programLayer))
 );
 
-const configPathCommand = Command.make("config", {}, () =>
+// === Config Subcommands ===
+
+// config model - view or set model/provider
+const providerOption = Options.text("provider").pipe(
+  Options.withAlias("p"),
+  Options.optional
+);
+const modelOption = Options.text("model").pipe(
+  Options.withAlias("m"),
+  Options.optional
+);
+
+const configModelCommand = Command.make(
+  "model",
+  { provider: providerOption, model: modelOption },
+  ({ provider, model }) =>
+    Effect.gen(function* () {
+      const config = yield* ConfigService;
+
+      // If both options provided, update the config
+      if (provider._tag === "Some" && model._tag === "Some") {
+        const result = yield* config.updateModel({
+          provider: provider.value,
+          model: model.value,
+        });
+        console.log(`Updated model configuration:`);
+        console.log(`  Provider: ${result.provider}`);
+        console.log(`  Model: ${result.model}`);
+      } else if (provider._tag === "Some" || model._tag === "Some") {
+        // If only one is provided, show an error
+        console.error(
+          "Error: Both --provider and --model must be specified together"
+        );
+        process.exit(1);
+      } else {
+        // No options, show current values
+        const current = yield* config.getModel();
+        console.log(`Current model configuration:`);
+        console.log(`  Provider: ${current.provider}`);
+        console.log(`  Model: ${current.model}`);
+      }
+    }).pipe(Effect.provide(programLayer))
+);
+
+// config repos list - list all repos
+const configReposListCommand = Command.make("list", {}, () =>
+  Effect.gen(function* () {
+    const config = yield* ConfigService;
+    const repos = yield* config.getRepos();
+
+    if (repos.length === 0) {
+      console.log("No repos configured.");
+      return;
+    }
+
+    console.log("Configured repos:\n");
+    for (const repo of repos) {
+      console.log(`  ${repo.name}`);
+      console.log(`    URL: ${repo.url}`);
+      console.log(`    Branch: ${repo.branch}`);
+      if (repo.specialNotes) {
+        console.log(`    Notes: ${repo.specialNotes}`);
+      }
+      console.log();
+    }
+  }).pipe(Effect.provide(programLayer))
+);
+
+// config repos add - add a new repo
+const repoNameOption = Options.text("name").pipe(Options.withAlias("n"));
+const repoUrlOption = Options.text("url").pipe(Options.withAlias("u"));
+const repoBranchOption = Options.text("branch").pipe(
+  Options.withAlias("b"),
+  Options.withDefault("main")
+);
+const repoNotesOption = Options.text("notes").pipe(Options.optional);
+
+const configReposAddCommand = Command.make(
+  "add",
+  {
+    name: repoNameOption,
+    url: repoUrlOption,
+    branch: repoBranchOption,
+    notes: repoNotesOption,
+  },
+  ({ name, url, branch, notes }) =>
+    Effect.gen(function* () {
+      const config = yield* ConfigService;
+
+      const repo = {
+        name,
+        url,
+        branch,
+        ...(notes._tag === "Some" ? { specialNotes: notes.value } : {}),
+      };
+
+      yield* config.addRepo(repo);
+      console.log(`Added repo "${name}":`);
+      console.log(`  URL: ${url}`);
+      console.log(`  Branch: ${branch}`);
+      if (notes._tag === "Some") {
+        console.log(`  Notes: ${notes.value}`);
+      }
+    }).pipe(
+      Effect.catchTag("ConfigError", (e) =>
+        Effect.sync(() => {
+          console.error(`Error: ${e.message}`);
+          process.exit(1);
+        })
+      ),
+      Effect.provide(programLayer)
+    )
+);
+
+// config repos - parent command for repo subcommands
+const configReposCommand = Command.make("repos", {}, () =>
+  Effect.sync(() => {
+    console.log("Usage: btca config repos <command>");
+    console.log("");
+    console.log("Commands:");
+    console.log("  list    List all configured repos");
+    console.log("  add     Add a new repo");
+  })
+).pipe(
+  Command.withSubcommands([configReposListCommand, configReposAddCommand])
+);
+
+// config - parent command
+const configCommand = Command.make("config", {}, () =>
   Effect.gen(function* () {
     const config = yield* ConfigService;
     const configPath = yield* config.getConfigPath();
 
-    console.log(`Update your config file at ${configPath}`);
+    console.log(`Config file: ${configPath}`);
+    console.log("");
+    console.log("Usage: btca config <command>");
+    console.log("");
+    console.log("Commands:");
+    console.log("  model   View or set the model and provider");
+    console.log("  repos   Manage configured repos");
   }).pipe(Effect.provide(programLayer))
-);
+).pipe(Command.withSubcommands([configModelCommand, configReposCommand]));
 
 // === Main Command ===
 const mainCommand = Command.make("btca", {}, () =>
@@ -192,7 +326,7 @@ const mainCommand = Command.make("btca", {}, () =>
     serveCommand,
     openCommand,
     chatCommand,
-    configPathCommand,
+    configCommand,
   ])
 );
 
